@@ -47,9 +47,23 @@
 (defun wexp-find (match)
   (with-temp-buffer
     (insert "<table>\n")
-    (dolist (elem wexp-articles)
-      (when (string-match match (dom-text (dom-by-tag elem 'encoded)))
-	(wexp-format elem)))
+    (let ((comics
+	   (loop for elem in wexp-articles
+		 when (and
+		       (string-match "<strong>"
+				     (dom-text (dom-by-tag elem 'encoded)))
+		       (string-match match
+				     (dom-text (dom-by-tag elem 'encoded))))
+		 append (wexp-format elem))))
+      (setq comics (cl-sort
+		    (cl-sort comics 'string<
+			     :key (lambda (e)
+				    (getf e :date)))
+		    'string<
+		    :key (lambda (e)
+			   (getf e :year))))
+      (dolist (comic comics)
+	(insert (getf comic :html) "\n")))
     (insert "</table>\n\n")
     (buffer-string)))
 
@@ -63,7 +77,10 @@
       (save-restriction
 	(narrow-to-region (point) (search-forward "</strong>"))
 	(goto-char (point-min))
-	(while (re-search-forward "\\(.*?\\) (\\([0-9][0-9][0-9][0-9]\\))\\( *[-#0-9]+,?\\)?" nil t)
+	(while (search-forward "\n" nil t)
+	  (replace-match " " t t))
+	(goto-char (point-min))
+	(while (re-search-forward "\\(.*?\\) (\\([0-9][0-9][0-9][0-9]\\))\\( *[-#0-9]+,?\\)?[, ]*" nil t)
 	  (push (list :title (match-string 1)
 		      :year (match-string 2)
 		      :issues (match-string 3))
@@ -75,33 +92,74 @@
 	(when (re-search-forward "src=.\\(https[^\"]+[0-9].jpg\\)" nil t)
 	  (push (match-string 1) covers)))
       (setq covers (nreverse covers)))
-    (dolist (comic (nreverse comics))
-      (insert
-       (format
-	"<tr><td>%s<td><img src=\"%s?w=150\"><td><a href=\"https://totaleclipse.blog/%s/%s/\">%s %s</a> <a href=%S>Alt</a></tr>\n"
-	(getf comic :year)
-	(if (> (length covers) 1)
-	    (pop covers)
-	  (car covers))
-	(replace-regexp-in-string
-	 "-" "/" (car (split-string
-		       (dom-text (dom-by-tag elem 'post_date)))))
-	(dom-text (dom-by-tag elem 'post_name))
-	(replace-regexp-in-string "<[^>]+>" "" (getf comic :title))
-	(replace-regexp-in-string "," "" (or (getf comic :issues) ""))
-	
-	(dom-text (dom-by-tag elem 'link)))))))
+    (loop for comic in (nreverse comics)
+	  collect
+	  (list
+	   :year (getf comic :year)
+	   :date (dom-text (dom-by-tag elem 'post_date))
+	   :html
+	   (format
+	    "<td><a href=\"https://totaleclipse.blog/%s/%s/\"><img src=\"%s?w=150\"><br>\n%s (%s)\n%s</a>%s\n"
+	    (replace-regexp-in-string
+	     "-" "/" (car (split-string
+			   (dom-text (dom-by-tag elem 'post_date)))))
+	    (dom-text (dom-by-tag elem 'post_name))
+	    (if (> (length covers) 1)
+		(pop covers)
+	      (car covers))
+	    (replace-regexp-in-string "<[^>]+>" "" (getf comic :title))
+	    (getf comic :year)
+	    (replace-regexp-in-string "," "" (or (getf comic :issues) ""))
+	    (if (string-match "p=" (dom-text (dom-by-tag elem 'link)))
+		(format " <a href=%S>Alt</a>"
+			(dom-text (dom-by-tag elem 'link)))
+	      ""))))))
 
 (defun wexp-all-comics ()
-  (with-temp-buffer
-    (insert "<table>\n")
-    (let ((start (point)))
-      (dolist (elem wexp-articles)
-	(when (string-match "<strong>" (dom-text (dom-by-tag elem 'encoded)))
-	  (wexp-format elem)))
-      (sort-lines nil start (point)))
-    (insert "</table>\n\n")
-    (buffer-string)))
+  (wexp-find "<strong>"))
+
+(defun wexp-divide-lines ()
+  (interactive)
+  (save-excursion
+    (re-search-backward "<table[> ]")
+    (let ((i 0)
+	  (end (save-excursion (search-forward "</table>"))))
+      (while (re-search-forward "<td>" end t)
+	(when (zerop (mod i 5))
+	  (beginning-of-line)
+	  (unless (zerop i)
+	    (insert "</tr>\n"))
+	  (insert "<tr>\n"))
+	(incf i))
+      (search-forward "</table>")
+      (beginning-of-line)
+      (loop for j from (mod i 5) upto 4
+	    do (insert "<td>\n"))
+      (insert "</tr>\n"))))
+
+(defun wexp-remove-alt ()
+  (interactive)
+  (save-excursion
+    (re-search-backward "<table[> ]")
+    (let ((i 0)
+	  (end (save-excursion (search-forward "</table>"))))
+      (while (re-search-forward " <a href.*>Alt</a>" end t)
+	(replace-match "")))))
+
+(defun wexp-prepare-table ()
+  (wexp-remove-alt)
+  (wexp-divide-lines)
+  (wexp-unfold))
+
+(defun wexp-unfold ()
+  (interactive)
+  (save-excursion
+    (re-search-backward "<table[> ]")
+    (let ((i 0)
+	  (end (save-excursion (search-forward "</table>"))))
+      (while (re-search-forward "<br>\n\\(.*\\)\n" end t)
+	(replace-match "\\1")))))
+  
 
 (provide 'wexp)
 
