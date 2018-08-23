@@ -53,7 +53,10 @@
 		       (string-match "<strong>"
 				     (dom-text (dom-by-tag elem 'encoded)))
 		       (string-match match
-				     (dom-text (dom-by-tag elem 'encoded))))
+				     (dom-text (dom-by-tag elem 'encoded)))
+		       (not (string-match
+			     "__trashed"
+			     (dom-text (dom-by-tag elem 'post_name)))))
 		 append (wexp-format elem))))
       (setq comics (cl-sort
 		    (cl-sort comics 'string<
