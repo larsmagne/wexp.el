@@ -240,11 +240,13 @@
        "-" "/" (car (split-string
 		     (dom-text (dom-by-tag elem 'post_date)))))
       (dom-text (dom-by-tag elem 'post_name))
-      (car
-       (last
-	(loop for img in (dom-by-tag html 'img)
-	      when (string-match "shot" (dom-attr img 'src))
-	      collect (dom-attr img 'src))))
+      (or
+       (car
+	(last
+	 (loop for img in (dom-by-tag html 'img)
+	       when (string-match "shot" (dom-attr img 'src))
+	       collect (dom-attr img 'src))))
+       "https://larsmagne23.files.wordpress.com/2015/09/scene-missing2.png")
       title-text
       year))))
 
