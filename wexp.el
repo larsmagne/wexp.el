@@ -196,6 +196,106 @@
 		    (dom-text (dom-by-tag article 'title)))))
   (insert "</ul>\n"))  
 
+(defun wexp-find-category (category title &optional sort-key)
+  (with-temp-buffer
+    (insert "<div class=\"index\">\n")
+    (let ((posts
+	   (loop for elem in wexp-articles
+		 when (and (loop for cat in (dom-by-tag elem 'category)
+				 when (equalp category (dom-text cat))
+				 return t)
+			   (string-match
+			    title (dom-text (dom-by-tag elem 'title))))
+		 collect (wexp-format-category elem))))
+      (setq posts (cl-sort
+		    (cl-sort posts 'string<
+			     :key (lambda (e)
+				    (getf e :date)))
+		    'string<
+		    :key (lambda (e)
+			   (getf e :year))))
+      (when sort-key
+	(setq posts (cl-sort posts 'string< :key sort-key)))
+      (dolist (post posts)
+	(insert (getf post :html) "\n")))
+    (insert "</div>\n\n")
+    (buffer-string)))
+
+(defun wexp-format-category-tsp (elem)
+  (let* ((html
+	  (with-temp-buffer
+	    (insert (dom-text (dom-by-tag elem 'encoded)))
+	    (libxml-parse-html-region (point-min) (point-max))))
+	 (title (dom-text (dom-by-tag elem 'title)))
+	 (year (and (string-match "TSP\\([0-9]+\\)" title)
+		    (match-string 1 title)))
+	 (title-text (replace-regexp-in-string "^[^:]+: " "" title)))
+    (list
+     :year year
+     :title title-text
+     :html
+     (format
+      "<div><a href=\"/%s/%s/\"><img src=\"%s?w=150\"><br>%s (%s)</a></div>\n"
+      (replace-regexp-in-string
+       "-" "/" (car (split-string
+		     (dom-text (dom-by-tag elem 'post_date)))))
+      (dom-text (dom-by-tag elem 'post_name))
+      (car
+       (last
+	(loop for img in (dom-by-tag html 'img)
+	      when (string-match "shot" (dom-attr img 'src))
+	      collect (dom-attr img 'src))))
+      title-text
+      year))))
+
+(defun wexp-format-category-bergman (elem)
+  (let* ((html
+	  (with-temp-buffer
+	    (insert (dom-text (dom-by-tag elem 'encoded)))
+	    (libxml-parse-html-region (point-min) (point-max))))
+	 (title (dom-text (dom-by-tag elem 'title)))
+	 (year (and (string-match "BT[A-Z]+ \\([0-9]+\\)" title)
+		    (match-string 1 title)))
+	 (title-text (replace-regexp-in-string "^[^:]+: " "" title)))
+    (list
+     :year year
+     :title title-text
+     :html
+     (format
+      "<div><a href=\"/%s/%s/\"><img src=\"%s?w=150\"><br>%s (%s)</a></div>\n"
+      (replace-regexp-in-string
+       "-" "/" (car (split-string
+		     (dom-text (dom-by-tag elem 'post_date)))))
+      (dom-text (dom-by-tag elem 'post_name))
+      (loop for img in (dom-by-tag html 'img)
+	    when (string-match "shot" (dom-attr img 'src))
+	    return (dom-attr img 'src))
+      title-text
+      year))))
+
+(defun wexp-format-category (elem)
+  (let* ((html
+	  (with-temp-buffer
+	    (insert (dom-text (dom-by-tag elem 'encoded)))
+	    (libxml-parse-html-region (point-min) (point-max))))
+	 (title (dom-text (dom-by-tag elem 'title)))
+	 (year (and (string-match "FF\\([0-9]+\\)" title)
+		    (match-string 1 title)))
+	 (title-text (replace-regexp-in-string "^[^:]+: " "" title)))
+    (list
+     :year year
+     :title title-text
+     :html
+     (format
+      "<div><a href=\"/%s/%s/\"><img src=\"%s?w=150\"><br>%s (%s)</a></div>\n"
+      (replace-regexp-in-string
+       "-" "/" (car (split-string
+		     (dom-text (dom-by-tag elem 'post_date)))))
+      (dom-text (dom-by-tag elem 'post_name))
+      (dom-attr (dom-by-tag html 'img) 'src)
+      title-text
+      year))))
+
 (provide 'wexp)
 
 ;;; wexp.el ends here
