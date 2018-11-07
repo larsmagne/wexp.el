@@ -44,7 +44,7 @@
     (xml-remove-comments (point-min) (point-max))
     (libxml-parse-xml-region (point-min) (point-max))))
 
-(defun wexp-find (match)
+(defun wexp-find (match &optional sort-key)
   (with-temp-buffer
     (insert "<div class=\"index\">\n")
     (let ((comics
@@ -65,6 +65,8 @@
 		    'string<
 		    :key (lambda (e)
 			   (getf e :year))))
+      (when sort-key
+	(setq comics (cl-sort comics 'string< :key sort-key)))
       (dolist (comic comics)
 	(insert (getf comic :html) "\n")))
     (insert "</div>\n\n")
@@ -100,6 +102,7 @@
 	  (list
 	   :year (getf comic :year)
 	   :date (dom-text (dom-by-tag elem 'post_date))
+	   :title (replace-regexp-in-string "<[^>]+>" "" (getf comic :title))
 	   :html
 	   (format
 	    "<div><a href=\"https://totaleclipse.blog/%s/%s/\"><img src=\"%s?w=150\"><br>\n%s (%s)\n%s</a>%s</div>\n"
@@ -120,6 +123,14 @@
 
 (defun wexp-all-comics ()
   (wexp-find "<strong>"))
+
+(defun wexp-alphabetical-comics ()
+  (wexp-find "<strong>"
+	     (lambda (e)
+	       (let ((string 
+		      (replace-regexp-in-string
+		       "^ +" "" (getf e :title))))
+		 (replace-regexp-in-string "^The \\|^A \\|^An " "" string)))))
 
 (defun wexp-remove-alt ()
   (interactive)
@@ -144,21 +155,46 @@
       (while (re-search-forward "<br>\n\\(.*\\)\n" end t)
 	(replace-match "\\1")))))
 
-(defun wexp-transform-table ()
-  (interactive)
-  (save-excursion
-    (re-search-backward "<table\\([> ]\\)")
-    (replace-match "<div\\1")
-    (let ((i 0)
-	  (start (point))
-	  (end (save-excursion (search-forward "</table>"))))
-      (while (re-search-forward "<tr>\\|</tr>" nil t)
-	(replace-match "" t t))
-      (goto-char start)
-      (while (re-search-forward "td>" nil t)
-	(replace-match "div>" t t))
-      (search-forward "</table>")
-      (replace-match "</div>"))))
+(defun wexp-generate-sidebar ()
+  (switch-to-buffer "*sidebar*")
+  (erase-buffer)
+  (insert "<ul>\n")
+  (dolist (article (cl-sort
+		    (loop for elem in wexp-articles
+			  when (string-match
+				"<strong>" (dom-text
+					    (dom-by-tag elem 'encoded)))
+			  collect elem)
+		    '<
+		    :key (lambda (e)
+			   (let ((title (dom-text (dom-by-tag e 'title))))
+			     (and (string-match "^\\([0-9]+\\)" title)
+				  (string-to-number (match-string 1 title)))))))
+    (insert (format "<li><a href=%S>%s</a>\n"
+		    (dom-text (dom-by-tag article 'link))
+		    (dom-text (dom-by-tag article 'title)))))
+  (insert "</ul>\n"))
+
+(defun wexp-generate-sidebar-2 ()
+  (switch-to-buffer "*sidebar*")
+  (erase-buffer)
+  (insert "<ul>\n")
+  (dolist (article (cl-sort
+		    (loop for elem in wexp-articles
+			  unless (string-match
+				"<strong>" (dom-text
+					    (dom-by-tag elem 'encoded)))
+			  collect elem)
+		    '<
+		    :key (lambda (e)
+			   (let ((title (dom-text (dom-by-tag e 'title))))
+			     (or (and (string-match "^\\([0-9]+\\)" title)
+				      (string-to-number (match-string 1 title)))
+				 0)))))
+    (insert (format "<li><a href=%S>%s</a>\n"
+		    (dom-text (dom-by-tag article 'link))
+		    (dom-text (dom-by-tag article 'title)))))
+  (insert "</ul>\n"))  
 
 (provide 'wexp)
 
