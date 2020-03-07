@@ -29,14 +29,15 @@
 (defvar wexp-articles nil)
 
 (defun wexp-parse-directory (dir)
-  (setq wexp-articles
-	(loop for file in (directory-files dir t "\.xml$")
-	      for dom = (wexp-parse-file file)
-	      append (loop for elem in (dom-by-tag dom 'item)
-			   unless (string-match
-				   "\\.files\\."
-				   (dom-text (dom-by-tag elem 'guid)))
-			   collect elem))))
+  (length
+   (setq wexp-articles
+	 (loop for file in (directory-files dir t "\.xml$")
+	       for dom = (wexp-parse-file file)
+	       append (loop for elem in (dom-by-tag dom 'item)
+			    unless (string-match
+				    "\\.files\\."
+				    (dom-text (dom-by-tag elem 'guid)))
+			    collect elem)))))
 
 (defun wexp-parse-file (file)
   (with-temp-buffer
@@ -297,6 +298,42 @@
       (dom-attr (dom-by-tag html 'img) 'src)
       title-text
       year))))
+
+(defun wexp-format-category-netflix (elem)
+  (let* ((html
+	  (with-temp-buffer
+	    (insert (dom-text (dom-by-tag elem 'encoded)))
+	    (libxml-parse-html-region (point-min) (point-max))))
+	 (title (dom-text (dom-by-tag elem 'title)))
+	 (date (and (string-match "NFLX2019 \\([^:]+\\)" title)
+		    (match-string 1 title)))
+	 (title-text (replace-regexp-in-string "^[^:]+: " "" title)))
+    (setq a html)
+    (list
+     :date date
+     :title title-text
+     :html
+     (format
+      "<div><a href=\"/%s/%s/\"><img src=\"%s?w=150\"></a><br><a href=%S>%s</a><br><a href=%S>%s</a></div>\n"
+      (replace-regexp-in-string
+       "-" "/" (car (split-string
+		     (dom-text (dom-by-tag elem 'post_date)))))
+      (dom-text (dom-by-tag elem 'post_name))
+      (loop for img in (dom-by-tag html 'img)
+	    when (string-match "img_" (dom-attr img 'src))
+	    return (replace-regexp-in-string "[?]w=[0-9]+" ""
+					     (dom-attr img 'src)))
+      (loop for link in (dom-by-tag html 'a)
+	    for href = (dom-attr link 'href)
+	    when (string-match "wikipedia" href)
+	    return href)
+      title-text
+      (loop for link in (dom-by-tag html 'a)
+	    for href = (dom-attr link 'href)
+	    when (string-match "imdb.com" href)
+	    return href)
+      (replace-regexp-in-string "[^☆★]" "" (dom-texts html))
+      ))))
 
 (provide 'wexp)
 
