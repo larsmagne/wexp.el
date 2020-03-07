@@ -41,9 +41,12 @@
 
 (defun wexp-parse-file (file)
   (with-temp-buffer
-    (insert-file-contents file)
+    (insert-file-contents-literally file)
     (xml-remove-comments (point-min) (point-max))
-    (libxml-parse-xml-region (point-min) (point-max))))
+    (goto-char (point-min))
+    (re-search-forward "<rss")
+    (beginning-of-line)
+    (libxml-parse-xml-region (point) (point-max))))
 
 (defun wexp-find (match &optional sort-key)
   (with-temp-buffer
@@ -334,6 +337,59 @@
 	    return href)
       (replace-regexp-in-string "[^☆★]" "" (dom-texts html))
       ))))
+
+;; (length (setq urls (wexp-attachments "~/Downloads/randomthoughts.WordPress.2020-03-07.xml")))
+
+(defun wexp-attachments (file)
+  (let ((files nil))
+    (with-temp-buffer
+      (insert-file-contents file)
+      (while (re-search-forward "<wp:attachment_url.*?\\(http[^]]+\\)" nil t)
+	(push (match-string 1) files)))
+    (nreverse files)))
+
+(defun wexp-download-images (urls)
+  (mapc 'wexp-download-image urls))
+
+(defun wexp-download-image (url)
+  (message "%s" url)
+  (let* ((parsed (url-generic-parse-url url))
+	 (path (url-filename parsed))
+	 (dest (concat "~/Download" path)))
+    (unless (file-exists-p (file-name-directory dest))
+      (make-directory (file-name-directory dest) t))
+    (unless (file-exists-p dest)
+      (with-current-buffer (url-retrieve-synchronously url t)
+	(goto-char (point-min))
+	(when (re-search-forward "\n\n" nil t)
+	  (write-region (point) (point-max) dest)
+	  (wexp-scale-image dest))
+	(kill-buffer (current-buffer))))))
+
+(defun wexp-scale-image (file)
+  (let* ((image (create-image file nil nil :scale 1))
+	 (size (image-size image t))
+	 (sizes '((1024 768)
+		  ;;(150 150)
+		  (1200 800)
+		  (1536 1152)
+		  (300 225)
+		  (768 576)
+		  ;;(825 510)
+		  )))
+    (loop for (x y) in sizes
+	  when (> (car size) x)
+	  do (call-process "convert" nil nil nil
+			   (expand-file-name file) "-resize" (format "%dx" x)
+			   (wexp-suffixsize
+			    (expand-file-name file)
+			    (format "%dx%d" x
+				    (round (* (/ x (float (car size)))
+						(cdr size)))))))
+    (image-flush image)))
+    
+(defun wexp-suffixsize (file suf)
+  (replace-regexp-in-string "[.][^.]+$" (format "-%s\\&" suf) file))
 
 (provide 'wexp)
 
