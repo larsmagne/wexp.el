@@ -43,6 +43,7 @@
   (with-temp-buffer
     (insert-file-contents-literally file)
     (xml-remove-comments (point-min) (point-max))
+    (decode-coding-region (point-min) (point-max) 'utf-8)
     (goto-char (point-min))
     (re-search-forward "<rss")
     (beginning-of-line)
@@ -54,7 +55,7 @@
     (let ((comics
 	   (loop for elem in wexp-articles
 		 when (and
-		       (string-match "<strong>"
+		       (string-match "<b>"
 				     (dom-text (dom-by-tag elem 'encoded)))
 		       (string-match match
 				     (dom-text (dom-by-tag elem 'encoded)))
@@ -84,7 +85,7 @@
       (insert text)
       (goto-char (point-min))
       (save-restriction
-	(narrow-to-region (point) (search-forward "</strong>"))
+	(narrow-to-region (point) (search-forward "</b>"))
 	(goto-char (point-min))
 	(while (search-forward "\n" nil t)
 	  (replace-match " " t t))
@@ -95,7 +96,7 @@
 		      :issues (match-string 3))
 		comics)))
       (goto-char (point-min))
-      (while (re-search-forward "src=.\\(https[^\"]+[0-9]-e.jpg\\)" nil t)
+      (while (re-search-forward "src=.\\(https[^\"]+[0-9]-E-scaled.jpg\\)" nil t)
 	(push (match-string 1) covers))
       (unless covers
 	(when (re-search-forward "src=.\\(https[^\"]+[0-9].jpg\\)" nil t)
@@ -109,18 +110,20 @@
 	   :title (replace-regexp-in-string "<[^>]+>" "" (getf comic :title))
 	   :html
 	   (format
-	    "<div><a href=\"https://totaleclipse.blog/%s/%s/\"><img src=\"%s?w=150\"><br>\n%s (%s)\n%s</a>%s</div>\n"
+	    "<div><a href=\"https://totaleclipse.blog/%s/%s/\"><img width=\"150\" src=\"%s\"><br>\n%s (%s)\n%s</a>%s</div>\n"
 	    (replace-regexp-in-string
 	     "-" "/" (car (split-string
 			   (dom-text (dom-by-tag elem 'post_date)))))
 	    (dom-text (dom-by-tag elem 'post_name))
-	    (if (> (length covers) 1)
-		(pop covers)
-	      (car covers))
+	    (replace-regexp-in-string
+	     "-scaled" "-300x225"
+	     (if (> (length covers) 1)
+		 (pop covers)
+	       (car covers)))
 	    (replace-regexp-in-string "<[^>]+>" "" (getf comic :title))
 	    (getf comic :year)
 	    (replace-regexp-in-string "," "" (or (getf comic :issues) ""))
-	    (if (string-match "p=" (dom-text (dom-by-tag elem 'link)))
+	    (if (and nil (string-match "p=" (dom-text (dom-by-tag elem 'link))))
 		(format " <a href=%S>Alt</a>"
 			(dom-text (dom-by-tag elem 'link)))
 	      ""))))))
@@ -285,7 +288,7 @@
 	    (insert (dom-text (dom-by-tag elem 'encoded)))
 	    (libxml-parse-html-region (point-min) (point-max))))
 	 (title (dom-text (dom-by-tag elem 'title)))
-	 (year (and (string-match "FF\\([0-9]+\\)" title)
+	 (year (and (string-match "^\\([0-9]+\\):" title)
 		    (match-string 1 title)))
 	 (title-text (replace-regexp-in-string "^[^:]+: " "" title)))
     (list
@@ -293,7 +296,7 @@
      :title title-text
      :html
      (format
-      "<div><a href=\"/%s/%s/\"><img src=\"%s?w=150\"><br>%s (%s)</a></div>\n"
+      "<div><a href=\"/%s/%s/\"><img src=\"%s\"><br>%s (%s)</a></div>\n"
       (replace-regexp-in-string
        "-" "/" (car (split-string
 		     (dom-text (dom-by-tag elem 'post_date)))))
