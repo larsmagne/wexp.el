@@ -39,6 +39,16 @@
 				    (dom-text (dom-by-tag elem 'guid)))
 			    collect elem)))))
 
+(defun wexp-parse-single-file (file)
+  (length
+   (setq wexp-articles
+	 (let ((dom (wexp-parse-file file)))
+	   (loop for elem in (dom-by-tag dom 'item)
+		 unless (string-match
+			 "\\.files\\."
+			 (dom-text (dom-by-tag elem 'guid)))
+		 collect elem)))))
+
 (defun wexp-parse-file (file)
   (with-temp-buffer
     (insert-file-contents-literally file)
@@ -110,13 +120,13 @@
 	   :title (replace-regexp-in-string "<[^>]+>" "" (getf comic :title))
 	   :html
 	   (format
-	    "<div><a href=\"https://totaleclipse.blog/%s/%s/\"><img width=\"150\" src=\"%s\"><br>\n%s (%s)\n%s</a>%s</div>\n"
+	    "<div><a href=\"https://lars.ingebrigtsen.no/%s/%s/\"><img width=\"150\" src=\"%s\"><br>\n%s (%s)\n%s</a>%s</div>\n"
 	    (replace-regexp-in-string
 	     "-" "/" (car (split-string
 			   (dom-text (dom-by-tag elem 'post_date)))))
 	    (dom-text (dom-by-tag elem 'post_name))
 	    (replace-regexp-in-string
-	     "-scaled" "-300x225"
+	     "-scaled" "-300x199"
 	     (if (> (length covers) 1)
 		 (pop covers)
 	       (car covers)))
@@ -213,7 +223,7 @@
 				 return t)
 			   (string-match
 			    title (dom-text (dom-by-tag elem 'title))))
-		 collect (wexp-format-category elem))))
+		 collect (wexp-format-category-otb elem))))
       (setq posts (cl-sort
 		    (cl-sort posts 'string<
 			     :key (lambda (e)
@@ -304,6 +314,44 @@
       (dom-attr (dom-by-tag html 'img) 'src)
       title-text
       year))))
+
+(defun wexp-format-category-otb (elem)
+  (let* ((html
+	  (with-temp-buffer
+	    (insert (dom-text (dom-by-tag elem 'encoded)))
+	    (libxml-parse-html-region (point-min) (point-max))))
+	 (title (dom-text (dom-by-tag elem 'title)))
+	 (number (and (string-match "^OTB#\\([0-9]+\\):" title)
+		      (match-string 1 title)))
+	 (year "0")
+	 (title-text (replace-regexp-in-string "^[^:]+: " "" title)))
+    (with-temp-buffer
+      (insert (dom-text (dom-by-tag elem 'encoded)))
+      (goto-char (point-min))
+      (if (re-search-forward "^<a.*?href=.\\([^\"\n]+\\)\".*?>[^>\n]+>. \\([^.\n]+\\)[.].*?\\([0-9]+\\).*\\([⚀⚁⚂⚃⚄⚅☐]\\)" nil t)
+	  (setq bfi (match-string 1)
+		director (match-string 2)
+		year (match-string 3)
+		rating (match-string 4))
+	(debug (current-buffer))))
+    (list
+     :year (format "%04d" (string-to-number number))
+     :title title-text
+     :html
+     (format
+      "<tr><td>#%s<td><a href=\"/%s/%s/\"><img width=\"300px\" src=\"%s\"></a><td>%s<td><a href=%S>%s</a><td>%s<td>%s<td>%s\n"
+      number
+      (replace-regexp-in-string
+       "-" "/" (car (split-string
+		     (dom-text (dom-by-tag elem 'post_date)))))
+      (dom-text (dom-by-tag elem 'post_name))
+      (dom-attr (dom-by-tag html 'img) 'src)
+      year
+      bfi
+      title-text
+      director
+      rating
+      ""))))
 
 (defun wexp-format-category-netflix (elem)
   (let* ((html
