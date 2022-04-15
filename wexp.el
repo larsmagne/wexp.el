@@ -31,23 +31,23 @@
 (defun wexp-parse-directory (dir)
   (length
    (setq wexp-articles
-	 (loop for file in (directory-files dir t "\.xml$")
-	       for dom = (wexp-parse-file file)
-	       append (loop for elem in (dom-by-tag dom 'item)
-			    unless (string-match
-				    "\\.files\\."
-				    (dom-text (dom-by-tag elem 'guid)))
-			    collect elem)))))
+	 (cl-loop for file in (directory-files dir t "\.xml$")
+		  for dom = (wexp-parse-file file)
+		  append (cl-loop for elem in (dom-by-tag dom 'item)
+				  unless (string-match
+					  "\\.files\\."
+					  (dom-text (dom-by-tag elem 'guid)))
+				  collect elem)))))
 
 (defun wexp-parse-single-file (file)
   (length
    (setq wexp-articles
 	 (let ((dom (wexp-parse-file file)))
-	   (loop for elem in (dom-by-tag dom 'item)
-		 unless (string-match
-			 "\\.files\\."
-			 (dom-text (dom-by-tag elem 'guid)))
-		 collect elem)))))
+	   (cl-loop for elem in (dom-by-tag dom 'item)
+		    unless (string-match
+			    "\\.files\\."
+			    (dom-text (dom-by-tag elem 'guid)))
+		    collect elem)))))
 
 (defun wexp-parse-file (file)
   (with-temp-buffer
@@ -63,16 +63,16 @@
   (with-temp-buffer
     (insert "<div class=\"index\">\n")
     (let ((comics
-	   (loop for elem in wexp-articles
-		 when (and
-		       (string-match "<b>"
-				     (dom-text (dom-by-tag elem 'encoded)))
-		       (string-match match
-				     (dom-text (dom-by-tag elem 'encoded)))
-		       (not (string-match
-			     "__trashed"
-			     (dom-text (dom-by-tag elem 'post_name)))))
-		 append (wexp-format elem))))
+	   (cl-loop for elem in wexp-articles
+		    when (and
+			  (string-match "<b>"
+					(dom-text (dom-by-tag elem 'encoded)))
+			  (string-match match
+					(dom-text (dom-by-tag elem 'encoded)))
+			  (not (string-match
+				"__trashed"
+				(dom-text (dom-by-tag elem 'post_name)))))
+		    append (wexp-format elem))))
       (setq comics (cl-sort
 		    (cl-sort comics 'string<
 			     :key (lambda (e)
@@ -112,31 +112,31 @@
 	(when (re-search-forward "src=.\\(https[^\"]+[0-9].jpg\\)" nil t)
 	  (push (match-string 1) covers)))
       (setq covers (nreverse covers)))
-    (loop for comic in (nreverse comics)
-	  collect
-	  (list
-	   :year (getf comic :year)
-	   :date (dom-text (dom-by-tag elem 'post_date))
-	   :title (replace-regexp-in-string "<[^>]+>" "" (getf comic :title))
-	   :html
-	   (format
-	    "<div><a href=\"https://lars.ingebrigtsen.no/%s/%s/\"><img width=\"150\" src=\"%s\"><br>\n%s (%s)\n%s</a>%s</div>\n"
-	    (replace-regexp-in-string
-	     "-" "/" (car (split-string
-			   (dom-text (dom-by-tag elem 'post_date)))))
-	    (dom-text (dom-by-tag elem 'post_name))
-	    (replace-regexp-in-string
-	     "-scaled" "-300x199"
-	     (if (> (length covers) 1)
-		 (pop covers)
-	       (car covers)))
-	    (replace-regexp-in-string "<[^>]+>" "" (getf comic :title))
-	    (getf comic :year)
-	    (replace-regexp-in-string "," "" (or (getf comic :issues) ""))
-	    (if (and nil (string-match "p=" (dom-text (dom-by-tag elem 'link))))
-		(format " <a href=%S>Alt</a>"
-			(dom-text (dom-by-tag elem 'link)))
-	      ""))))))
+    (cl-loop for comic in (nreverse comics)
+	     collect
+	     (list
+	      :year (getf comic :year)
+	      :date (dom-text (dom-by-tag elem 'post_date))
+	      :title (replace-regexp-in-string "<[^>]+>" "" (getf comic :title))
+	      :html
+	      (format
+	       "<div><a href=\"https://lars.ingebrigtsen.no/%s/%s/\"><img width=\"150\" src=\"%s\"><br>\n%s (%s)\n%s</a>%s</div>\n"
+	       (replace-regexp-in-string
+		"-" "/" (car (split-string
+			      (dom-text (dom-by-tag elem 'post_date)))))
+	       (dom-text (dom-by-tag elem 'post_name))
+	       (replace-regexp-in-string
+		"-scaled" "-300x199"
+		(if (> (length covers) 1)
+		    (pop covers)
+		  (car covers)))
+	       (replace-regexp-in-string "<[^>]+>" "" (getf comic :title))
+	       (getf comic :year)
+	       (replace-regexp-in-string "," "" (or (getf comic :issues) ""))
+	       (if (and nil (string-match "p=" (dom-text (dom-by-tag elem 'link))))
+		   (format " <a href=%S>Alt</a>"
+			   (dom-text (dom-by-tag elem 'link)))
+		 ""))))))
 
 (defun wexp-all-comics ()
   (wexp-find "<strong>"))
@@ -177,11 +177,11 @@
   (erase-buffer)
   (insert "<ul>\n")
   (dolist (article (cl-sort
-		    (loop for elem in wexp-articles
-			  when (string-match
-				"<strong>" (dom-text
-					    (dom-by-tag elem 'encoded)))
-			  collect elem)
+		    (cl-loop for elem in wexp-articles
+			     when (string-match
+				   "<strong>" (dom-text
+					       (dom-by-tag elem 'encoded)))
+			     collect elem)
 		    '<
 		    :key (lambda (e)
 			   (let ((title (dom-text (dom-by-tag e 'title))))
@@ -197,11 +197,11 @@
   (erase-buffer)
   (insert "<ul>\n")
   (dolist (article (cl-sort
-		    (loop for elem in wexp-articles
-			  unless (string-match
-				"<strong>" (dom-text
-					    (dom-by-tag elem 'encoded)))
-			  collect elem)
+		    (cl-loop for elem in wexp-articles
+			     unless (string-match
+				     "<strong>" (dom-text
+						 (dom-by-tag elem 'encoded)))
+			     collect elem)
 		    '<
 		    :key (lambda (e)
 			   (let ((title (dom-text (dom-by-tag e 'title))))
@@ -217,13 +217,13 @@
   (with-temp-buffer
     (insert "<div class=\"index\">\n")
     (let ((posts
-	   (loop for elem in wexp-articles
-		 when (and (loop for cat in (dom-by-tag elem 'category)
-				 when (equalp category (dom-text cat))
-				 return t)
-			   (string-match
-			    title (dom-text (dom-by-tag elem 'title))))
-		 collect (wexp-format-category-otb elem))))
+	   (cl-loop for elem in wexp-articles
+		    when (and (cl-loop for cat in (dom-by-tag elem 'category)
+				       when (equalp category (dom-text cat))
+				       return t)
+			      (string-match
+			       title (dom-text (dom-by-tag elem 'title))))
+		    collect (wexp-format-category-otb elem))))
       (setq posts (cl-sort
 		    (cl-sort posts 'string<
 			     :key (lambda (e)
@@ -260,9 +260,9 @@
       (or
        (car
 	(last
-	 (loop for img in (dom-by-tag html 'img)
-	       when (string-match "shot" (dom-attr img 'src))
-	       collect (dom-attr img 'src))))
+	 (cl-loop for img in (dom-by-tag html 'img)
+		  when (string-match "shot" (dom-attr img 'src))
+		  collect (dom-attr img 'src))))
        "https://larsmagne23.files.wordpress.com/2015/09/scene-missing2.png")
       title-text
       year))))
@@ -286,9 +286,9 @@
        "-" "/" (car (split-string
 		     (dom-text (dom-by-tag elem 'post_date)))))
       (dom-text (dom-by-tag elem 'post_name))
-      (loop for img in (dom-by-tag html 'img)
-	    when (string-match "shot" (dom-attr img 'src))
-	    return (dom-attr img 'src))
+      (cl-loop for img in (dom-by-tag html 'img)
+	       when (string-match "shot" (dom-attr img 'src))
+	       return (dom-attr img 'src))
       title-text
       year))))
 
@@ -373,19 +373,19 @@
        "-" "/" (car (split-string
 		     (dom-text (dom-by-tag elem 'post_date)))))
       (dom-text (dom-by-tag elem 'post_name))
-      (loop for img in (dom-by-tag html 'img)
-	    when (string-match "img_" (dom-attr img 'src))
-	    return (replace-regexp-in-string "[?]w=[0-9]+" ""
-					     (dom-attr img 'src)))
-      (loop for link in (dom-by-tag html 'a)
-	    for href = (dom-attr link 'href)
-	    when (string-match "wikipedia" href)
-	    return href)
+      (cl-loop for img in (dom-by-tag html 'img)
+	       when (string-match "img_" (dom-attr img 'src))
+	       return (replace-regexp-in-string "[?]w=[0-9]+" ""
+						(dom-attr img 'src)))
+      (cl-loop for link in (dom-by-tag html 'a)
+	       for href = (dom-attr link 'href)
+	       when (string-match "wikipedia" href)
+	       return href)
       title-text
-      (loop for link in (dom-by-tag html 'a)
-	    for href = (dom-attr link 'href)
-	    when (string-match "imdb.com" href)
-	    return href)
+      (cl-loop for link in (dom-by-tag html 'a)
+	       for href = (dom-attr link 'href)
+	       when (string-match "imdb.com" href)
+	       return href)
       (replace-regexp-in-string "[^☆★]" "" (dom-texts html))
       ))))
 
@@ -434,19 +434,19 @@
 		  (768 576)
 		  ;;(825 510)
 		  )))
-    (loop for (x y) in sizes
-	  for dest = (wexp-suffixsize
-		      (expand-file-name file)
-		      (format "%dx%d" x
-			      (round (* (/ x (float (car size)))
-					(cdr size)))))
-	  when (and (> (car size) x)
-		    (not (string-match "[0-9]+x[0-9]+.jpg$" file))
-		    (not (file-exists-p dest)))
-	  do (call-process "convert" nil nil nil
-			   (expand-file-name file) "-resize" (format "%dx" x)
-			   "-quality" "80"
-			   dest))
+    (cl-loop for (x y) in sizes
+	     for dest = (wexp-suffixsize
+			 (expand-file-name file)
+			 (format "%dx%d" x
+				 (round (* (/ x (float (car size)))
+					   (cdr size)))))
+	     when (and (> (car size) x)
+		       (not (string-match "[0-9]+x[0-9]+.jpg$" file))
+		       (not (file-exists-p dest)))
+	     do (call-process "convert" nil nil nil
+			      (expand-file-name file) "-resize" (format "%dx" x)
+			      "-quality" "80"
+			      dest))
     (image-flush image)))
     
 (defun wexp-suffixsize (file suf)
