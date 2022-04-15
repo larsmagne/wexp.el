@@ -414,8 +414,14 @@
 	(goto-char (point-min))
 	(when (re-search-forward "\n\n" nil t)
 	  (write-region (point) (point-max) dest)
-	  (wexp-scale-image dest))
+	  ;;(wexp-scale-image dest)
+	  )
 	(kill-buffer (current-buffer))))))
+
+(defun wexp-scale-all-images (dir)
+  (dolist (file (directory-files-recursively dir "[.]jpg\\'"))
+    (message "%s" file)
+    (wexp-scale-image file)))
 
 (defun wexp-scale-image (file)
   (let* ((image (create-image file nil nil :scale 1))
@@ -429,14 +435,18 @@
 		  ;;(825 510)
 		  )))
     (loop for (x y) in sizes
-	  when (> (car size) x)
+	  for dest = (wexp-suffixsize
+		      (expand-file-name file)
+		      (format "%dx%d" x
+			      (round (* (/ x (float (car size)))
+					(cdr size)))))
+	  when (and (> (car size) x)
+		    (not (string-match "[0-9]+x[0-9]+.jpg$" file))
+		    (not (file-exists-p dest)))
 	  do (call-process "convert" nil nil nil
 			   (expand-file-name file) "-resize" (format "%dx" x)
-			   (wexp-suffixsize
-			    (expand-file-name file)
-			    (format "%dx%d" x
-				    (round (* (/ x (float (car size)))
-						(cdr size)))))))
+			   "-quality" "80"
+			   dest))
     (image-flush image)))
     
 (defun wexp-suffixsize (file suf)
